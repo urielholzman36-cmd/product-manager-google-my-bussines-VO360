@@ -12,10 +12,12 @@ export default function UploadPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [status, setStatus] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null)
   const [productCount, setProductCount] = useState<number | null>(null)
-  const [isReady, setIsReady] = useState(false)
   const [parsedProducts, setParsedProducts] = useState<Omit<Product, 'imageFile'>[]>([])
   const csvRef = useRef<HTMLInputElement>(null)
   const imgRef = useRef<HTMLInputElement>(null)
+
+  // Derived — no useState needed
+  const isReady = parsedProducts.length > 0 && imageFiles.length > 0
 
   const handleCSV = async (file: File) => {
     setCsvFile(file)
@@ -23,13 +25,11 @@ export default function UploadPage() {
     const result = await parseFile(file)
     if (result.errors.length > 0) {
       setStatus({ message: result.errors[0], type: 'error' })
-      setIsReady(false)
       return
     }
     setParsedProducts(result.products)
     setProductCount(result.products.length)
     setStatus({ message: `Found ${result.products.length} products`, type: 'success' })
-    setIsReady(imageFiles.length > 0)
   }
 
   const handleImages = (files: FileList) => {
@@ -44,7 +44,6 @@ export default function UploadPage() {
       setStatus({ message: `Warning: ${largeWarnings.length} image(s) are over 5MB. Consider compressing for faster uploads.`, type: 'info' })
     }
     setImageFiles(arr)
-    setIsReady(parsedProducts.length > 0)
   }
 
   const handleStart = () => {
