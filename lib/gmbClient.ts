@@ -101,6 +101,46 @@ export async function uploadProduct(
   }
 }
 
+export interface GmbLocation {
+  accountId: string
+  locationId: string
+  locationName: string
+  accountName: string
+}
+
+export async function getAllLocations(accessToken: string): Promise<GmbLocation[]> {
+  const accountsRes = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!accountsRes.ok) throw new Error('Failed to fetch GMB accounts')
+  const accountsData = await accountsRes.json()
+  const accounts = accountsData.accounts ?? []
+
+  const locations: GmbLocation[] = []
+
+  for (const account of accounts) {
+    const accountId = account.name?.split('/')[1]
+    const accountName = account.accountName ?? account.name ?? accountId
+    if (!accountId) continue
+
+    const locRes = await fetch(`https://mybusiness.googleapis.com/v4/accounts/${accountId}/locations`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!locRes.ok) continue
+
+    const locData = await locRes.json()
+    for (const loc of (locData.locations ?? [])) {
+      const locationId = loc.name?.split('/')[1]
+      const locationName = loc.locationName ?? loc.title ?? locationId
+      if (locationId) {
+        locations.push({ accountId, locationId, locationName, accountName })
+      }
+    }
+  }
+
+  return locations
+}
+
 export async function getLocationId(accessToken: string): Promise<{ accountId: string; locationId: string }> {
   const accountsRes = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
     headers: { Authorization: `Bearer ${accessToken}` },

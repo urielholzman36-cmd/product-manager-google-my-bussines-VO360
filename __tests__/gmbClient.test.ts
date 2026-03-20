@@ -1,4 +1,4 @@
-import { buildProductPayload } from '@/lib/gmbClient'
+import { buildProductPayload, getAllLocations } from '@/lib/gmbClient'
 
 describe('gmbClient', () => {
   it('builds product payload with price', () => {
@@ -12,5 +12,13 @@ describe('gmbClient', () => {
   it('builds product payload without price when empty', () => {
     const payload = buildProductPayload('Wallet', 'Great wallet', '')
     expect(payload.price).toBeUndefined()
+  })
+
+  // Mock fetch for getAllLocations
+  it('getAllLocations returns empty array when no accounts', async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ accounts: [] }) })
+    const result = await getAllLocations('token')
+    expect(result).toEqual([])
   })
 })

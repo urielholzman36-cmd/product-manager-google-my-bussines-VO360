@@ -1,13 +1,14 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProductSession } from '@/context/ProductSessionContext'
 import { parseFile } from '@/lib/parseCSV'
 import type { Product } from '@/context/ProductSessionContext'
+import type { GmbLocation } from '@/lib/gmbClient'
 
 export default function UploadPage() {
   const router = useRouter()
-  const { setProducts } = useProductSession()
+  const { setProducts, setLocationId, setAccountId, setSelectedLocationName } = useProductSession()
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [status, setStatus] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null)
@@ -16,8 +17,48 @@ export default function UploadPage() {
   const csvRef = useRef<HTMLInputElement>(null)
   const imgRef = useRef<HTMLInputElement>(null)
 
-  // Derived — no useState needed
-  const isReady = parsedProducts.length > 0 && imageFiles.length > 0
+  // Business selector state
+  const [locations, setLocations] = useState<GmbLocation[]>([])
+  const [locationsLoading, setLocationsLoading] = useState(false)
+  const [locationsError, setLocationsError] = useState<string | null>(null)
+  const [selectedLocation, setSelectedLocation] = useState<GmbLocation | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const bothLoaded = parsedProducts.length > 0 && imageFiles.length > 0
+
+  // Auto-fetch locations when both CSV and images are loaded
+  useEffect(() => {
+    if (!bothLoaded) return
+    if (locations.length > 0 || locationsLoading) return
+    fetchLocations()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bothLoaded])
+
+  const fetchLocations = async () => {
+    setLocationsLoading(true)
+    setLocationsError(null)
+    try {
+      const res = await fetch('/api/gmb/locations')
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? 'Failed to fetch locations')
+      }
+      const data = await res.json()
+      setLocations(data.locations ?? [])
+    } catch (err) {
+      setLocationsError(err instanceof Error ? err.message : 'Failed to fetch locations')
+    } finally {
+      setLocationsLoading(false)
+    }
+  }
+
+  const filteredLocations = locations.filter(loc =>
+    loc.locationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    loc.accountName.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Derived — requires all three: CSV, images, and a selected business
+  const isReady = parsedProducts.length > 0 && imageFiles.length > 0 && selectedLocation !== null
 
   const handleCSV = async (file: File) => {
     setCsvFile(file)
@@ -47,12 +88,16 @@ export default function UploadPage() {
   }
 
   const handleStart = () => {
+    if (!selectedLocation) return
     const imageMap = new Map(imageFiles.map(f => [f.name, f]))
     const products: Product[] = parsedProducts.map(p => ({
       ...p,
       imageFile: imageMap.get(p.image_filename) ?? null,
     }))
     setProducts(products)
+    setLocationId(selectedLocation.locationId)
+    setAccountId(selectedLocation.accountId)
+    setSelectedLocationName(selectedLocation.locationName)
     router.push('/review')
   }
 
@@ -101,6 +146,74 @@ export default function UploadPage() {
           {status && (
             <div className={`text-sm text-center ${status.type === 'error' ? 'text-red-400' : status.type === 'success' ? 'text-[#4ecca3]' : 'text-gray-400'}`}>
               {status.message}
+            </div>
+          )}
+
+          {/* Business Selector — shown once both CSV and images are loaded */}
+          {bothLoaded && (
+            <div className="bg-[#16213e] rounded-xl p-5 flex flex-col gap-3 border border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-[#4ecca3]">Select Business Location</h3>
+                {selectedLocation && (
+                  <span className="text-xs text-gray-400 truncate max-w-[200px]">{selectedLocation.locationName}</span>
+                )}
+              </div>
+
+              {locationsLoading && (
+                <div className="text-center text-gray-400 py-4 text-sm">Loading your business locations...</div>
+              )}
+
+              {locationsError && !locationsLoading && (
+                <div className="flex flex-col gap-2 items-center py-2">
+                  <p className="text-red-400 text-sm text-center">{locationsError}</p>
+                  <button
+                    onClick={fetchLocations}
+                    className="text-xs border border-[#4ecca3] text-[#4ecca3] px-3 py-1 rounded-full hover:bg-[#4ecca3] hover:text-[#1a1a2e] transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {!locationsLoading && !locationsError && locations.length > 0 && (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Search by business or account name..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="bg-[#1a1a2e] border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#4ecca3]"
+                  />
+                  <div className="max-h-48 overflow-y-auto flex flex-col gap-1 pr-1">
+                    {filteredLocations.length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-3">No results for &quot;{searchQuery}&quot;</p>
+                    ) : (
+                      filteredLocations.map(loc => (
+                        <button
+                          key={`${loc.accountId}-${loc.locationId}`}
+                          onClick={() => setSelectedLocation(loc)}
+                          className={`text-left px-3 py-2 rounded-lg transition-colors ${
+                            selectedLocation?.locationId === loc.locationId && selectedLocation?.accountId === loc.accountId
+                              ? 'bg-[#4ecca3] text-[#1a1a2e]'
+                              : 'hover:bg-[#0f3460] text-white'
+                          }`}
+                        >
+                          <div className="font-medium text-sm">{loc.locationName}</div>
+                          <div className={`text-xs mt-0.5 ${
+                            selectedLocation?.locationId === loc.locationId && selectedLocation?.accountId === loc.accountId
+                              ? 'text-[#1a1a2e] opacity-70'
+                              : 'text-gray-400'
+                          }`}>{loc.accountName}</div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+
+              {!locationsLoading && !locationsError && locations.length === 0 && (
+                <p className="text-gray-500 text-sm text-center py-3">No business locations found. Make sure you are connected with Google.</p>
+              )}
             </div>
           )}
 

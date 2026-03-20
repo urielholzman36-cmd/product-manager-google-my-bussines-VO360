@@ -24,6 +24,10 @@ interface ProductSessionState {
   skippedCount: number
   locationId: string
   setLocationId: (id: string) => void
+  accountId: string
+  setAccountId: (id: string) => void
+  selectedLocationName: string
+  setSelectedLocationName: (name: string) => void
   reset: () => void
 }
 
@@ -33,6 +37,8 @@ export function ProductSessionProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([])
   const [results, setResults] = useState<ReviewResult[]>([])
   const [locationId, setLocationId] = useState('')
+  const [accountId, setAccountId] = useState('')
+  const [selectedLocationName, setSelectedLocationName] = useState('')
 
   const addResult = (result: ReviewResult) => {
     setResults(prev => [...prev, result])
@@ -45,6 +51,8 @@ export function ProductSessionProvider({ children }: { children: ReactNode }) {
     setProducts([])
     setResults([])
     setLocationId('')
+    setAccountId('')
+    setSelectedLocationName('')
   }
 
   return (
@@ -53,6 +61,8 @@ export function ProductSessionProvider({ children }: { children: ReactNode }) {
       results, addResult,
       approvedCount, skippedCount,
       locationId, setLocationId,
+      accountId, setAccountId,
+      selectedLocationName, setSelectedLocationName,
       reset,
     }}>
       {children}
