@@ -30,6 +30,9 @@ yarn-error.log*
 .env*.local
 .superpowers/
 
+# Google OAuth credentials
+client_secret_*.json
+
 # vercel
 .vercel
 
