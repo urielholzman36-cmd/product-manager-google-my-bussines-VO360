@@ -1,101 +1,123 @@
-import Image from "next/image";
+'use client'
+import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { useProductSession } from '@/context/ProductSessionContext'
+import { parseFile } from '@/lib/parseCSV'
+import type { Product } from '@/context/ProductSessionContext'
 
-export default function Home() {
+export default function UploadPage() {
+  const router = useRouter()
+  const { setProducts } = useProductSession()
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [status, setStatus] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null)
+  const [productCount, setProductCount] = useState<number | null>(null)
+  const [isReady, setIsReady] = useState(false)
+  const [parsedProducts, setParsedProducts] = useState<Omit<Product, 'imageFile'>[]>([])
+  const csvRef = useRef<HTMLInputElement>(null)
+  const imgRef = useRef<HTMLInputElement>(null)
+
+  const handleCSV = async (file: File) => {
+    setCsvFile(file)
+    setStatus({ message: 'Parsing file...', type: 'info' })
+    const result = await parseFile(file)
+    if (result.errors.length > 0) {
+      setStatus({ message: result.errors[0], type: 'error' })
+      setIsReady(false)
+      return
+    }
+    setParsedProducts(result.products)
+    setProductCount(result.products.length)
+    setStatus({ message: `Found ${result.products.length} products`, type: 'success' })
+    setIsReady(imageFiles.length > 0)
+  }
+
+  const handleImages = (files: FileList) => {
+    const arr = Array.from(files).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f.name))
+    const oversized = arr.filter(f => f.size > 10 * 1024 * 1024)
+    if (oversized.length > 0) {
+      setStatus({ message: `Images too large (>10MB): ${oversized.map(f => f.name).join(', ')}. Please compress them.`, type: 'error' })
+      return
+    }
+    const largeWarnings = arr.filter(f => f.size > 5 * 1024 * 1024)
+    if (largeWarnings.length > 0) {
+      setStatus({ message: `Warning: ${largeWarnings.length} image(s) are over 5MB. Consider compressing for faster uploads.`, type: 'info' })
+    }
+    setImageFiles(arr)
+    setIsReady(parsedProducts.length > 0)
+  }
+
+  const handleStart = () => {
+    const imageMap = new Map(imageFiles.map(f => [f.name, f]))
+    const products: Product[] = parsedProducts.map(p => ({
+      ...p,
+      imageFile: imageMap.get(p.image_filename) ?? null,
+    }))
+    setProducts(products)
+    router.push('/review')
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-[#1a1a2e] text-white flex flex-col">
+      <header className="bg-[#0f3460] px-8 py-4 flex justify-between items-center">
+        <h1 className="text-[#4ecca3] font-bold text-xl">GMB Product Uploader</h1>
+        <a href="/api/auth/login" className="border border-[#4ecca3] text-[#4ecca3] text-sm px-4 py-2 rounded-full">
+          Connect with Google
+        </a>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      <main className="flex-1 flex items-center justify-center p-10">
+        <div className="w-full max-w-2xl flex flex-col gap-6">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold">Upload Your Products</h2>
+            <p className="text-gray-400 mt-2">Drop your CSV and images folder to get started</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => csvRef.current?.click()}
+              className="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-[#4ecca3] transition-colors bg-[#16213e]"
+            >
+              <div className="text-4xl mb-2">📊</div>
+              <div className="font-bold">{csvFile ? csvFile.name : 'Select CSV or Excel'}</div>
+              <div className="text-gray-400 text-sm mt-1">{productCount != null ? `${productCount} products found` : 'CSV or Excel file'}</div>
+            </button>
+            <input ref={csvRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+              onChange={e => e.target.files?.[0] && handleCSV(e.target.files[0])} />
+
+            <button
+              onClick={() => imgRef.current?.click()}
+              className="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-[#4ecca3] transition-colors bg-[#16213e]"
+            >
+              <div className="text-4xl mb-2">🖼️</div>
+              <div className="font-bold">{imageFiles.length > 0 ? 'Images selected' : 'Select Images Folder'}</div>
+              <div className="text-gray-400 text-sm mt-1">{imageFiles.length > 0 ? `${imageFiles.length} images` : 'JPG, PNG, WEBP'}</div>
+            </button>
+            <input ref={imgRef} type="file" multiple className="hidden"
+              // @ts-expect-error webkitdirectory not in types
+              webkitdirectory=""
+              onChange={e => e.target.files && handleImages(e.target.files)} />
+          </div>
+
+          {status && (
+            <div className={`text-sm text-center ${status.type === 'error' ? 'text-red-400' : status.type === 'success' ? 'text-[#4ecca3]' : 'text-gray-400'}`}>
+              {status.message}
+            </div>
+          )}
+
+          <button
+            onClick={isReady ? handleStart : undefined}
+            aria-disabled={!isReady}
+            className={`w-full py-5 rounded-xl font-bold text-lg transition-opacity ${isReady ? 'bg-[#4ecca3] text-[#1a1a2e] cursor-pointer' : 'bg-[#4ecca3] text-[#1a1a2e] opacity-40 cursor-not-allowed'}`}
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            Start Reviewing Products →
+          </button>
+
+          <p className="text-center text-xs text-gray-500">
+            CSV columns expected: <span className="text-gray-400">name, description, price, image_filename</span>
+          </p>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
-  );
+  )
 }
