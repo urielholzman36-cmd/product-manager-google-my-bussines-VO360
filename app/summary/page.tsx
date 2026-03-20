@@ -1,10 +1,17 @@
 'use client'
+import { useEffect } from 'react'
 import { useProductSession } from '@/context/ProductSessionContext'
 import { useRouter } from 'next/navigation'
 
 export default function SummaryPage() {
   const { approvedCount, skippedCount, locationId, reset } = useProductSession()
   const router = useRouter()
+
+  useEffect(() => {
+    if (approvedCount === 0 && skippedCount === 0 && !locationId) {
+      router.push('/')
+    }
+  }, [approvedCount, skippedCount, locationId])
 
   const handleUploadMore = () => {
     reset()
