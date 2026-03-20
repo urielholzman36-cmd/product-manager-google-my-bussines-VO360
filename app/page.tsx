@@ -5,6 +5,7 @@ import { useProductSession } from '@/context/ProductSessionContext'
 import { parseFile } from '@/lib/parseCSV'
 import type { Product } from '@/context/ProductSessionContext'
 import type { GmbLocation } from '@/lib/gmbClient'
+import * as XLSX from 'xlsx'
 
 export default function UploadPage() {
   const router = useRouter()
@@ -23,6 +24,9 @@ export default function UploadPage() {
   const [locationsError, setLocationsError] = useState<string | null>(null)
   const [selectedLocation, setSelectedLocation] = useState<GmbLocation | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [manualMode, setManualMode] = useState(false)
+  const [manualAccountId, setManualAccountId] = useState('')
+  const [manualLocationId, setManualLocationId] = useState('')
 
   const bothLoaded = parsedProducts.length > 0 && imageFiles.length > 0
 
@@ -58,7 +62,8 @@ export default function UploadPage() {
   )
 
   // Derived — requires all three: CSV, images, and a selected business
-  const isReady = parsedProducts.length > 0 && imageFiles.length > 0 && selectedLocation !== null
+  const manualReady = manualMode && manualAccountId.trim() !== '' && manualLocationId.trim() !== ''
+  const isReady = parsedProducts.length > 0 && imageFiles.length > 0 && (selectedLocation !== null || manualReady)
 
   const handleCSV = async (file: File) => {
     setCsvFile(file)
@@ -87,17 +92,47 @@ export default function UploadPage() {
     setImageFiles(arr)
   }
 
+  const TEMPLATE_ROWS = [
+    { name: 'Blue Denim Jacket', category: 'Clothing', price: '59.99', description: 'Comfortable casual jacket for everyday wear', landing_page_url: 'https://yourstore.com/jacket', image_filename: 'jacket.jpg' },
+    { name: 'Leather Wallet', category: 'Accessories', price: '34.99', description: 'Slim bifold wallet made from genuine leather', landing_page_url: '', image_filename: 'wallet.jpg' },
+    { name: 'Wireless Earbuds', category: 'Electronics', price: '79.99', description: 'Crystal clear sound with noise cancellation', landing_page_url: '', image_filename: 'earbuds.jpg' },
+  ]
+
+  const downloadCSV = () => {
+    const header = 'name,category,price,description,landing_page_url,image_filename'
+    const rows = TEMPLATE_ROWS.map(r => `"${r.name}","${r.category}","${r.price}","${r.description}","${r.landing_page_url}","${r.image_filename}"`)
+    const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'products-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const downloadExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(TEMPLATE_ROWS)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Products')
+    XLSX.writeFile(wb, 'products-template.xlsx')
+  }
+
   const handleStart = () => {
-    if (!selectedLocation) return
     const imageMap = new Map(imageFiles.map(f => [f.name, f]))
     const products: Product[] = parsedProducts.map(p => ({
       ...p,
       imageFile: imageMap.get(p.image_filename) ?? null,
     }))
     setProducts(products)
-    setLocationId(selectedLocation.locationId)
-    setAccountId(selectedLocation.accountId)
-    setSelectedLocationName(selectedLocation.locationName)
+    if (manualMode) {
+      setLocationId(manualLocationId.trim())
+      setAccountId(manualAccountId.trim())
+      setSelectedLocationName('Manual Entry')
+    } else if (selectedLocation) {
+      setLocationId(selectedLocation.locationId)
+      setAccountId(selectedLocation.accountId)
+      setSelectedLocationName(selectedLocation.locationName)
+    }
     router.push('/review')
   }
 
@@ -163,14 +198,51 @@ export default function UploadPage() {
                 <div className="text-center text-gray-400 py-4 text-sm">Loading your business locations...</div>
               )}
 
-              {locationsError && !locationsLoading && (
+              {locationsError && !locationsLoading && !manualMode && (
                 <div className="flex flex-col gap-2 items-center py-2">
-                  <p className="text-red-400 text-sm text-center">{locationsError}</p>
+                  <p className="text-red-400 text-sm text-center">Could not load locations automatically.</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={fetchLocations}
+                      className="text-xs border border-[#4ecca3] text-[#4ecca3] px-3 py-1 rounded-full hover:bg-[#4ecca3] hover:text-[#1a1a2e] transition-colors"
+                    >
+                      Retry
+                    </button>
+                    <button
+                      onClick={() => setManualMode(true)}
+                      className="text-xs border border-gray-500 text-gray-400 px-3 py-1 rounded-full hover:border-gray-300 transition-colors"
+                    >
+                      Enter IDs manually
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {manualMode && (
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs text-gray-400">
+                    Find your IDs in your Google Business Profile URL:<br />
+                    <span className="text-gray-500">business.google.com/n/<b>ACCOUNT_ID</b>/l/<b>LOCATION_ID</b></span>
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Account ID"
+                    value={manualAccountId}
+                    onChange={e => setManualAccountId(e.target.value)}
+                    className="bg-[#1a1a2e] border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#4ecca3]"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Location ID"
+                    value={manualLocationId}
+                    onChange={e => setManualLocationId(e.target.value)}
+                    className="bg-[#1a1a2e] border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#4ecca3]"
+                  />
                   <button
-                    onClick={fetchLocations}
-                    className="text-xs border border-[#4ecca3] text-[#4ecca3] px-3 py-1 rounded-full hover:bg-[#4ecca3] hover:text-[#1a1a2e] transition-colors"
+                    onClick={() => setManualMode(false)}
+                    className="text-xs text-gray-500 hover:text-gray-300 text-left"
                   >
-                    Retry
+                    ← Back to automatic
                   </button>
                 </div>
               )}
@@ -225,9 +297,19 @@ export default function UploadPage() {
             Start Reviewing Products →
           </button>
 
-          <p className="text-center text-xs text-gray-500">
-            CSV columns expected: <span className="text-gray-400">name, description, price, image_filename</span>
-          </p>
+          <div className="text-center">
+            <p className="text-xs text-gray-500">
+              Required columns: <span className="text-gray-400">name, category</span>
+              {'  ·  '}
+              Optional: <span className="text-gray-400">price, description, landing_page_url, image_filename</span>
+            </p>
+            <p className="text-xs text-gray-600 mt-1">
+              Don&apos;t have a file?{' '}
+              <button onClick={downloadCSV} className="text-[#4ecca3] hover:underline">Download CSV template</button>
+              {' '}or{' '}
+              <button onClick={downloadExcel} className="text-[#4ecca3] hover:underline">Download Excel template</button>
+            </p>
+          </div>
         </div>
       </main>
     </div>

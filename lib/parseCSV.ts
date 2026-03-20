@@ -8,11 +8,12 @@ export interface ParseResult {
   warnings: string[]
 }
 
-const REQUIRED_COLUMNS = ['name', 'description', 'price', 'image_filename']
+const REQUIRED_COLUMNS = ['name', 'category']
 
-function validatePrice(val: string): string {
-  const num = parseFloat(val)
-  return isNaN(num) || val.trim() === '' ? '' : val.trim()
+function validatePrice(val: unknown): string {
+  const str = String(val ?? '').trim()
+  const num = parseFloat(str)
+  return isNaN(num) || str === '' ? '' : str
 }
 
 function processRows(rows: Record<string, string>[]): ParseResult {
@@ -20,17 +21,17 @@ function processRows(rows: Record<string, string>[]): ParseResult {
   const warnings: string[] = []
 
   rows.forEach((row, i) => {
-    const price = validatePrice(row.price ?? '')
-    if (!price && (row.price ?? '').trim() !== '') {
-      warnings.push(`Row ${i + 1}: price is missing or invalid`)
-    } else if ((row.price ?? '').trim() === '') {
-      warnings.push(`Row ${i + 1}: price is missing or invalid`)
+    const price = validatePrice(row.price)
+    if (String(row.price ?? '').trim() !== '' && !price) {
+      warnings.push(`Row ${i + 1}: price is not a valid number, it will be left blank`)
     }
     products.push({
-      name: (row.name ?? '').trim(),
-      description: (row.description ?? '').trim(),
+      name: String(row.name ?? '').trim(),
+      category: String(row.category ?? '').trim(),
       price,
-      image_filename: (row.image_filename ?? '').trim(),
+      description: String(row.description ?? '').trim(),
+      landing_page_url: String(row.landing_page_url ?? '').trim(),
+      image_filename: String(row.image_filename ?? '').trim(),
     })
   })
 

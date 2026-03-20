@@ -6,19 +6,22 @@ interface Price {
 
 interface ProductPayload {
   name: string
+  category: string
   description: string
   price?: Price
+  url?: string
   languageCode: string
 }
 
-export function buildProductPayload(name: string, description: string, price: string): ProductPayload {
-  const payload: ProductPayload = { name, description, languageCode: 'en' }
+export function buildProductPayload(name: string, category: string, description: string, price: string, landingPageUrl: string): ProductPayload {
+  const payload: ProductPayload = { name, category, description, languageCode: 'en' }
   if (price && !isNaN(parseFloat(price))) {
     const num = parseFloat(price)
     const units = Math.floor(num).toString()
     const nanos = Math.round((num - Math.floor(num)) * 1_000_000_000)
     payload.price = { currencyCode: 'USD', units, nanos }
   }
+  if (landingPageUrl) payload.url = landingPageUrl
   return payload
 }
 
@@ -53,17 +56,19 @@ export async function uploadProduct(
   accountId: string,
   locationId: string,
   productName: string,
+  category: string,
   description: string,
   price: string,
+  landingPageUrl: string,
   imageBase64: string | null
 ): Promise<void> {
-  const payload = buildProductPayload(productName, description, price)
+  const payload = buildProductPayload(productName, category, description, price, landingPageUrl)
 
   // Upload image first if provided, attach mediaItemId to payload
   if (imageBase64) {
     const mediaName = await uploadImageToGMB(accessToken, accountId, locationId, imageBase64)
     if (mediaName) {
-      (payload as Record<string, unknown>).media = [{ mediaFormat: 'PHOTO', name: mediaName }]
+      (payload as unknown as Record<string, unknown>).media = [{ mediaFormat: 'PHOTO', name: mediaName }]
     }
   }
 
@@ -112,7 +117,10 @@ export async function getAllLocations(accessToken: string): Promise<GmbLocation[
   const accountsRes = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
-  if (!accountsRes.ok) throw new Error('Failed to fetch GMB accounts')
+  if (!accountsRes.ok) {
+    const body = await accountsRes.text()
+    throw new Error(`Failed to fetch GMB accounts (${accountsRes.status}): ${body}`)
+  }
   const accountsData = await accountsRes.json()
   const accounts = accountsData.accounts ?? []
 

@@ -3,8 +3,10 @@ import { createContext, useContext, useState, ReactNode } from 'react'
 
 export interface Product {
   name: string
-  description: string
+  category: string
   price: string
+  description: string
+  landing_page_url: string
   image_filename: string
   imageFile: File | null
 }

@@ -8,7 +8,7 @@ const TestConsumer = () => {
       <span data-testid="count">{products.length}</span>
       <span data-testid="approved">{approvedCount}</span>
       <span data-testid="skipped">{skippedCount}</span>
-      <button onClick={() => setProducts([{ name: 'Test', description: '', price: '9.99', image_filename: 'test.jpg', imageFile: null }])}>
+      <button onClick={() => setProducts([{ name: 'Test', category: 'Other', description: '', price: '9.99', landing_page_url: '', image_filename: 'test.jpg', imageFile: null }])}>
         Add
       </button>
     </div>

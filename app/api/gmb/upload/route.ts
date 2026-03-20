@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await uploadProduct(tokens.accessToken, accountId, locationId, product.name, product.description, product.price, imageBase64 ?? null)
+    await uploadProduct(tokens.accessToken, accountId, locationId, product.name, product.category ?? '', product.description ?? '', product.price ?? '', product.landing_page_url ?? '', imageBase64 ?? null)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('GMB upload error:', err)

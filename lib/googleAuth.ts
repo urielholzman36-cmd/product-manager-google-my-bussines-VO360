@@ -36,7 +36,8 @@ export function parseTokenCookies(cookieHeader: string): TokenPair | null {
 }
 
 export function makeTokenCookies(accessToken: string, refreshToken: string): string[] {
-  const opts = 'HttpOnly; Secure; SameSite=Lax; Max-Age=2592000; Path=/'
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+  const opts = `HttpOnly${secure}; SameSite=Lax; Max-Age=2592000; Path=/`
   return [
     `gmb_access_token=${accessToken}; ${opts}`,
     `gmb_refresh_token=${refreshToken}; ${opts}`,

@@ -7,14 +7,13 @@ type DescriptionState = 'loading' | 'ready' | 'error'
 
 export default function ReviewPage() {
   const router = useRouter()
-  const { products, addResult, approvedCount, skippedCount, reset, setLocationId } = useProductSession()
+  const { products, addResult, approvedCount, skippedCount, reset, locationId, accountId } = useProductSession()
   const [index, setIndex] = useState(0)
   const [aiDescription, setAiDescription] = useState('')
   const [descState, setDescState] = useState<DescriptionState>('loading')
   const [activeTab, setActiveTab] = useState<'original' | 'ai'>('ai')
   const [editedDescription, setEditedDescription] = useState('')
   const [isEditing, setIsEditing] = useState(false)
-  const [gmbIds, setGmbIds] = useState<{ accountId: string; locationId: string }>({ accountId: '', locationId: '' })
 
   const product = products[index]
 
@@ -65,18 +64,6 @@ export default function ReviewPage() {
 
     try {
       const imageBase64 = product.imageFile ? await toBase64(product.imageFile) : null
-      // Fetch accountId/locationId from API (cached in local state after first call)
-      let { accountId, locationId: locId } = gmbIds
-      if (!accountId || !locId) {
-        const res = await fetch('/api/gmb/location')
-        if (res.ok) {
-          const data = await res.json()
-          accountId = data.accountId
-          locId = data.locationId
-          setGmbIds({ accountId, locationId: locId })
-          setLocationId(locId) // also store in session context for summary screen
-        }
-      }
       await fetch('/api/gmb/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,7 +71,7 @@ export default function ReviewPage() {
           product: { ...product, description: finalDescription },
           imageBase64,
           accountId,
-          locationId: locId,
+          locationId,
         }),
       })
     } catch { /* error shown in future enhancement */ }
