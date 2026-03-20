@@ -11,7 +11,7 @@ export default function SummaryPage() {
     if (approvedCount === 0 && skippedCount === 0 && !locationId) {
       router.push('/')
     }
-  }, [approvedCount, skippedCount, locationId])
+  }, [approvedCount, skippedCount, locationId, router])
 
   const handleUploadMore = () => {
     reset()

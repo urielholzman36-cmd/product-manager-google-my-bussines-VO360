@@ -51,6 +51,7 @@ describe('Summary Screen — with mocked context', () => {
 
     render(<SummaryPage />)
     fireEvent.click(screen.getByText(/upload more products/i))
+    expect(mockReset).toHaveBeenCalledTimes(1)
     expect(mockPush).toHaveBeenCalledWith('/')
   })
 
